@@ -1,0 +1,158 @@
+{
+  "timestamp": "2026-05-24T07:04:43Z",
+  "total": 10,
+  "passed": 10,
+  "failed": 0,
+  "cases": [
+    {
+      "case": "high-context-single-file",
+      "pass": true,
+      "scores": {
+        "found": true,
+        "idiomatic_correct": true,
+        "confidence_met": true,
+        "referent_match": true,
+        "referent_partial": 1.0,
+        "tier_correct": true
+      },
+      "confidence": 0.88,
+      "referent": "the login form in src/auth/LoginForm.tsx (specifically the email validation bug)",
+      "elapsed_s": 10.3
+    },
+    {
+      "case": "high-context-multi-file",
+      "pass": true,
+      "scores": {
+        "found": true,
+        "idiomatic_correct": true,
+        "confidence_met": true,
+        "referent_match": true,
+        "referent_partial": 0.6666666666666666,
+        "tier_correct": true
+      },
+      "confidence": 0.88,
+      "referent": "the User model and Order model (models/user.py and models/order.py)",
+      "elapsed_s": 10.2
+    },
+    {
+      "case": "medium-context-ambiguous",
+      "pass": true,
+      "scores": {
+        "found": true,
+        "idiomatic_correct": true,
+        "confidence_met": true,
+        "referent_match": true,
+        "referent_partial": 1.0,
+        "tier_correct": true
+      },
+      "confidence": 0.8,
+      "referent": "the deprecated API endpoint at /api/v1/users",
+      "elapsed_s": 6.7
+    },
+    {
+      "case": "low-context-bare-pronoun",
+      "pass": true,
+      "scores": {
+        "found": true,
+        "idiomatic_correct": true,
+        "confidence_met": true,
+        "referent_match": true,
+        "referent_partial": 1.0,
+        "tier_correct": true
+      },
+      "confidence": 0.99,
+      "referent": "N/A",
+      "elapsed_s": 5.6
+    },
+    {
+      "case": "self-contained-high-context",
+      "pass": true,
+      "scores": {
+        "found": true,
+        "idiomatic_correct": true,
+        "confidence_met": true,
+        "referent_match": true,
+        "referent_partial": 1.0,
+        "tier_correct": true
+      },
+      "confidence": 0.95,
+      "referent": "the null pointer exception in src/auth/handler.ts at line 42 when the session cookie is missing",
+      "elapsed_s": 9.0
+    },
+    {
+      "case": "chained-pronouns",
+      "pass": true,
+      "scores": {
+        "found": true,
+        "idiomatic_correct": true,
+        "confidence_met": true,
+        "referent_match": true,
+        "referent_partial": 1.0,
+        "tier_correct": true
+      },
+      "confidence": 0.9,
+      "referent": "the extracted rate-limit.ts utility",
+      "elapsed_s": 10.5
+    },
+    {
+      "case": "idiomatic-erlang",
+      "pass": true,
+      "scores": {
+        "found": true,
+        "idiomatic_correct": true,
+        "confidence_met": true,
+        "referent_match": true,
+        "referent_partial": 1.0,
+        "tier_correct": true
+      },
+      "confidence": 0.95,
+      "referent": "N/A",
+      "elapsed_s": 9.9
+    },
+    {
+      "case": "structural-with-context",
+      "pass": true,
+      "scores": {
+        "found": true,
+        "idiomatic_correct": true,
+        "confidence_met": true,
+        "referent_match": true,
+        "referent_partial": 1.0,
+        "tier_correct": true
+      },
+      "confidence": 0.88,
+      "referent": "the proposed refactoring of the payment processing pipeline to use an event-driven architecture with a message queue",
+      "elapsed_s": 8.0
+    },
+    {
+      "case": "high-context-recent-symbol",
+      "pass": true,
+      "scores": {
+        "found": true,
+        "idiomatic_correct": true,
+        "confidence_met": true,
+        "referent_match": true,
+        "referent_partial": 1.0,
+        "tier_correct": true
+      },
+      "confidence": 0.95,
+      "referent": "the function processUserData in utils/transform.ts",
+      "elapsed_s": 7.3
+    },
+    {
+      "case": "structural-with-adjacent-instruction",
+      "pass": true,
+      "scores": {
+        "found": true,
+        "idiomatic_correct": true,
+        "confidence_met": true,
+        "referent_match": true,
+        "referent_partial": 1.0,
+        "tier_correct": true
+      },
+      "confidence": 0.88,
+      "referent": "the proposed new approach to error handling",
+      "elapsed_s": 10.0
+    }
+  ]
+}
