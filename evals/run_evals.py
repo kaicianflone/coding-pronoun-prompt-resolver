@@ -66,7 +66,12 @@ def call_haiku(prompt):
     inner = inner.strip()
     if inner.startswith("```"):
         lines = inner.split("\n")
-        inner = "\n".join(lines[1:-1])
+        end_idx = len(lines) - 1
+        for i in range(1, len(lines)):
+            if lines[i].strip().startswith("```"):
+                end_idx = i
+                break
+        inner = "\n".join(lines[1:end_idx])
 
     try:
         return json.loads(inner)

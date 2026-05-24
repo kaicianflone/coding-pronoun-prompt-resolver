@@ -46,36 +46,45 @@ if resolutions:
     LAST_PRONOUN=$(printf '%s' "$LAST_RESOLUTION" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['pronoun'])")
     LAST_RESOLVED=$(printf '%s' "$LAST_RESOLUTION" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['resolved_to'])")
 
-    CORRECTION_TEMPLATE=$(cat "$SKILL_DIR/prompts/correction-detector.md")
-    CORRECTION_PROMPT=$(printf '%s' "$CORRECTION_TEMPLATE" \
-      | sed "s|{{PRONOUN}}|$LAST_PRONOUN|g" \
-      | sed "s|{{RESOLVED_TO}}|$LAST_RESOLVED|g" \
-      | sed "s|{{USER_MESSAGE}}|$(printf '%s' "$USER_MSG" | sed 's/[&/\]/\\&/g')|g"
-    )
+    CORRECTION_PROMPT=$(python3 -c "
+import sys
+template = open('$SKILL_DIR/prompts/correction-detector.md').read()
+msg = sys.stdin.read()
+result = template.replace('{{PRONOUN}}', '$LAST_PRONOUN')
+result = result.replace('{{RESOLVED_TO}}', '$LAST_RESOLVED')
+result = result.replace('{{USER_MESSAGE}}', msg)
+print(result)
+" <<< "$USER_MSG")
 
     CORRECTION_RESULT=$(printf '%s' "$CORRECTION_PROMPT" | claude -p --model haiku --output-format json 2>/dev/null || echo '{}')
 
-    IS_CORRECTION=$(python3 -c "
+    IS_CORRECTION=$(python3 << 'PYCHECK'
 import json, sys
 raw = sys.stdin.read().strip()
 try:
     wrapper = json.loads(raw)
-    inner = wrapper.get('result', raw)
-except:
+    inner = str(wrapper.get('result', raw))
+except (json.JSONDecodeError, TypeError):
     inner = raw
-inner = str(inner).strip()
-if inner.startswith('\`\`\`'):
+inner = inner.strip()
+if inner.startswith('```'):
     lines = inner.split('\n')
-    inner = '\n'.join(lines[1:-1])
+    for i in range(1, len(lines)):
+        if lines[i].strip().startswith('```'):
+            inner = '\n'.join(lines[1:i])
+            break
+    else:
+        inner = '\n'.join(lines[1:])
 try:
     data = json.loads(inner)
     if data.get('is_correction', False):
         print('yes')
     else:
         print('no')
-except:
+except (json.JSONDecodeError, TypeError):
     print('no')
-" <<< "$CORRECTION_RESULT")
+PYCHECK
+ <<< "$CORRECTION_RESULT")
 
     if [ "$IS_CORRECTION" = "yes" ]; then
       source "$SCRIPT_DIR/ledger.sh"

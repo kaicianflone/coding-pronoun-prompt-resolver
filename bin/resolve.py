@@ -22,7 +22,12 @@ def parse_claude_json(raw):
     inner = inner.strip()
     if inner.startswith("```"):
         lines = inner.split("\n")
-        inner = "\n".join(lines[1:-1])
+        end_idx = len(lines) - 1
+        for i in range(1, len(lines)):
+            if lines[i].strip().startswith("```"):
+                end_idx = i
+                break
+        inner = "\n".join(lines[1:end_idx])
 
     try:
         return json.loads(inner)
@@ -135,10 +140,18 @@ def run_council(user_msg, pronoun, project_dir, skill_dir):
 
 
 def main():
-    payload = json.loads(sys.stdin.read())
-    user_msg = payload["user_message"]
-    pronouns = ",".join(payload["pronouns"])
-    project_dir = payload["project_dir"]
+    raw_input = sys.stdin.read().strip()
+    if not raw_input:
+        return
+    try:
+        payload = json.loads(raw_input)
+    except (json.JSONDecodeError, TypeError):
+        return
+    user_msg = payload.get("user_message", "")
+    if not user_msg:
+        return
+    pronouns = ",".join(payload.get("pronouns", []))
+    project_dir = payload.get("project_dir", ".")
     skill_dir = os.environ.get("SKILL_DIR", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     ledger_path = os.path.join(project_dir, ".claude", "pronoun-ledger.json")
 
