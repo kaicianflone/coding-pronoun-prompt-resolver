@@ -15,6 +15,12 @@ hooks:
 
 # Pronoun Resolver
 
+## Arguments
+
+If invoked with `--stats`: run `python3 ~/.claude/skills/pronoun-resolver/bin/stats.py` and display the output. Do not proceed with the rest of this skill.
+
+---
+
 You are operating with the pronoun resolver active. When the hook detects ambiguous
 references in a user message, you will see flags injected before the message.
 
