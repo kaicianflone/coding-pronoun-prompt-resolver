@@ -46,16 +46,17 @@ demos = set(sys.argv[2].lower().split())
 ambiguous = []
 words = msg.split()
 for i, w in enumerate(words):
-    if w.rstrip('.,!?;:') in demos:
-        # Ambiguous if: at end, or next word is a verb/conjunction/preposition
-        if i == len(words) - 1:
-            ambiguous.append(w.rstrip('.,!?;:'))
+    clean = re.split(r\"['+,.!?;:]\", w)[0]
+    if clean in demos:
+        is_contraction = \"'\" in w and clean != w
+        if is_contraction or i == len(words) - 1:
+            ambiguous.append(clean)
         else:
-            next_w = words[i+1].rstrip('.,!?;:')
+            next_w = re.split(r\"['+,.!?;:]\", words[i+1])[0]
             verbs = {'is','are','was','were','has','have','had','do','does','did','will','would','should','could','can','may','might','shall','must','need','work','works','look','looks','seem','seems','feel','feels','go','goes','come','comes','run','runs','make','makes','break','breaks','fail','fails','pass','passes','take','takes','get','gets'}
             conj = {'and','or','but','yet','so','then','because','if','when','while','after','before','since','until','unless','although','though','however','instead','rather','anyway'}
             if next_w in verbs or next_w in conj:
-                ambiguous.append(w.rstrip('.,!?;:'))
+                ambiguous.append(clean)
 if ambiguous:
     print(','.join(sorted(set(ambiguous))))
 " "$USER_MSG_FLAT" "$(printf '%s' "$DEMO_MATCHES" | tr '\n' ' ')" 2>/dev/null || true)
