@@ -2,7 +2,6 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-SKILL_DIR="$(dirname "$SCRIPT_DIR")"
 PROJECT_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
 # Check for disable sentinel
@@ -17,111 +16,87 @@ if [ -z "$USER_MSG" ]; then
   exit 0
 fi
 
-LEDGER_PATH="$PROJECT_DIR/.claude/pronoun-ledger.json"
+# Normalize: collapse newlines to spaces for pattern matching and output
+USER_MSG_FLAT="${USER_MSG//$'\n'/ }"
 
-# Prune stale ledger entries on first run of the session
-if [ -f "$LEDGER_PATH" ]; then
-  PRUNE_SENTINEL="/tmp/.pronoun-resolver-pruned-$(date +%Y%m%d)"
-  if [ ! -f "$PRUNE_SENTINEL" ]; then
-    source "$SCRIPT_DIR/ledger.sh"
-    ledger_prune "$LEDGER_PATH" 2>/dev/null || true
-    touch "$PRUNE_SENTINEL"
-  fi
+# --- Detection Phase (no LLM calls, pure regex/heuristic) ---
+
+FLAGS=()
+
+# 1. Personal pronouns (always referential — always flag)
+PERSONAL_REGEX='\b(it|them|they|its)\b'
+PERSONAL_MATCHES=$(printf '%s\n' "$USER_MSG_FLAT" | grep -ioE "$PERSONAL_REGEX" || true)
+
+if [ -n "$PERSONAL_MATCHES" ]; then
+  PERSONAL_UNIQUE=$(printf '%s' "$PERSONAL_MATCHES" | tr '[:upper:]' '[:lower:]' | sort -u | tr '\n' ',' | sed 's/,$//')
+  FLAGS+=("[AMBIGUOUS: pronouns=\"$PERSONAL_UNIQUE\" | type=pronoun]")
 fi
 
-# Correction detection — check if previous resolution was wrong
-if [ -f "$LEDGER_PATH" ]; then
-  LAST_RESOLUTION=$(python3 -c "
-import json
-with open('$LEDGER_PATH') as f:
-    data = json.load(f)
-resolutions = data.get('resolutions', [])
-if resolutions:
-    last = resolutions[-1]
-    if not last.get('was_corrected', False):
-        print(json.dumps(last))
-" 2>/dev/null || true)
+# 2. Demonstratives (this/that/these/those) — only flag when used as standalone pronoun,
+#    not as determiner ("this function", "that file" are self-contained)
+DEMO_REGEX='\b(this|that|these|those)\b'
+DEMO_MATCHES=$(printf '%s\n' "$USER_MSG_FLAT" | grep -ioE "$DEMO_REGEX" || true)
 
-  if [ -n "$LAST_RESOLUTION" ]; then
-    LAST_PRONOUN=$(printf '%s' "$LAST_RESOLUTION" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['pronoun'])")
-    LAST_RESOLVED=$(printf '%s' "$LAST_RESOLUTION" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['resolved_to'])")
+if [ -n "$DEMO_MATCHES" ]; then
+  # Filter: only keep demonstratives NOT followed by a noun-like word
+  AMBIGUOUS_DEMOS=$(python3 -c "
+import re, sys
+msg = sys.argv[1].lower()
+demos = set(sys.argv[2].lower().split())
+ambiguous = []
+words = msg.split()
+for i, w in enumerate(words):
+    clean = re.split(r\"['+,.!?;:]\", w)[0]
+    if clean in demos:
+        is_contraction = \"'\" in w and clean != w
+        if is_contraction or i == len(words) - 1:
+            ambiguous.append(clean)
+        else:
+            next_w = re.split(r\"['+,.!?;:]\", words[i+1])[0]
+            verbs = {'is','are','was','were','has','have','had','do','does','did','will','would','should','could','can','may','might','shall','must','need','work','works','look','looks','seem','seems','feel','feels','go','goes','come','comes','run','runs','make','makes','break','breaks','fail','fails','pass','passes','take','takes','get','gets'}
+            conj = {'and','or','but','yet','so','then','because','if','when','while','after','before','since','until','unless','although','though','however','instead','rather','anyway'}
+            if next_w in verbs or next_w in conj:
+                ambiguous.append(clean)
+if ambiguous:
+    print(','.join(sorted(set(ambiguous))))
+" "$USER_MSG_FLAT" "$(printf '%s' "$DEMO_MATCHES" | tr '\n' ' ')" 2>/dev/null || true)
 
-    CORRECTION_PROMPT=$(python3 -c "
-import sys
-template = open('$SKILL_DIR/prompts/correction-detector.md').read()
-msg = sys.stdin.read()
-result = template.replace('{{PRONOUN}}', '$LAST_PRONOUN')
-result = result.replace('{{RESOLVED_TO}}', '$LAST_RESOLVED')
-result = result.replace('{{USER_MESSAGE}}', msg)
-print(result)
-" <<< "$USER_MSG")
-
-    CORRECTION_RESULT=$(printf '%s' "$CORRECTION_PROMPT" | claude -p --model haiku --output-format json 2>/dev/null || echo '{}')
-
-    IS_CORRECTION=$(python3 << 'PYCHECK'
-import json, sys
-raw = sys.stdin.read().strip()
-try:
-    wrapper = json.loads(raw)
-    inner = str(wrapper.get('result', raw))
-except (json.JSONDecodeError, TypeError):
-    inner = raw
-inner = inner.strip()
-if inner.startswith('```'):
-    lines = inner.split('\n')
-    for i in range(1, len(lines)):
-        if lines[i].strip().startswith('```'):
-            inner = '\n'.join(lines[1:i])
-            break
-    else:
-        inner = '\n'.join(lines[1:])
-try:
-    data = json.loads(inner)
-    if data.get('is_correction', False):
-        print('yes')
-    else:
-        print('no')
-except (json.JSONDecodeError, TypeError):
-    print('no')
-PYCHECK
- <<< "$CORRECTION_RESULT")
-
-    if [ "$IS_CORRECTION" = "yes" ]; then
-      source "$SCRIPT_DIR/ledger.sh"
-      ledger_mark_corrected "$LEDGER_PATH" "$LAST_PRONOUN"
-      CONTEXT_SIGNAL=$(printf '%s' "$LAST_RESOLUTION" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('context_signal_used','none'))")
-      ledger_update_context_reliability "$LEDGER_PATH" "$CONTEXT_SIGNAL" "false"
+  if [ -n "$AMBIGUOUS_DEMOS" ]; then
+    # Merge with personal pronouns if present
+    if [ ${#FLAGS[@]} -gt 0 ]; then
+      # Replace the existing pronoun flag with merged list
+      MERGED="$PERSONAL_UNIQUE,$AMBIGUOUS_DEMOS"
+      MERGED=$(printf '%s' "$MERGED" | tr ',' '\n' | sort -u | tr '\n' ',' | sed 's/,$//' | sed 's/^,//')
+      FLAGS=("[AMBIGUOUS: pronouns=\"$MERGED\" | type=pronoun]")
+    else
+      FLAGS+=("[AMBIGUOUS: pronouns=\"$AMBIGUOUS_DEMOS\" | type=pronoun]")
     fi
   fi
 fi
 
-# Target pronouns — word-boundary matched
-PRONOUNS_REGEX='\b(it|them|these|those|that|this|they|its)\b'
+# 3. Vague referents (removed "thing" — too noisy on common English)
+VAGUE_REGEX='\b(other|something|someone|somewhere|anything|everything|stuff)\b'
+VAGUE_MATCHES=$(printf '%s\n' "$USER_MSG_FLAT" | grep -ioE "$VAGUE_REGEX" || true)
 
-# Case-insensitive scan
-MATCHES=$(printf '%s' "$USER_MSG" | grep -ioE "$PRONOUNS_REGEX" || true)
-
-if [ -z "$MATCHES" ]; then
-  exit 0
+if [ -n "$VAGUE_MATCHES" ]; then
+  VAGUE_UNIQUE=$(printf '%s' "$VAGUE_MATCHES" | tr '[:upper:]' '[:lower:]' | sort -u | tr '\n' ',' | sed 's/,$//')
+  FLAGS+=("[AMBIGUOUS: vague=\"$VAGUE_UNIQUE\" | type=vague_referent]")
 fi
 
-# Deduplicate and lowercase
-UNIQUE_PRONOUNS=$(printf '%s' "$MATCHES" | tr '[:upper:]' '[:lower:]' | sort -u | tr '\n' ',' | sed 's/,$//')
+# 4. Bare imperatives (only if no pronouns/vague found — those take priority)
+if [ ${#FLAGS[@]} -eq 0 ]; then
+  IMPLICIT_TYPE=$(python3 "$SCRIPT_DIR/detect-implicit.py" <<< "$USER_MSG_FLAT" 2>/dev/null || echo "none")
+  if [ -n "$IMPLICIT_TYPE" ] && [ "$IMPLICIT_TYPE" != "none" ]; then
+    # Extract just the verb for consistent flag format (not the full message)
+    VERB=$(printf '%s' "$USER_MSG_FLAT" | awk '{print tolower($1)}')
+    FLAGS+=("[AMBIGUOUS: implicit verb=\"$VERB\" | type=bare_imperative | subtype=$IMPLICIT_TYPE]")
+  fi
+fi
 
-# Build JSON payload for the resolver
-PAYLOAD=$(python3 -c "
-import json, sys
-msg = sys.stdin.read()
-pronouns = '${UNIQUE_PRONOUNS}'.split(',')
-print(json.dumps({
-    'user_message': msg,
-    'pronouns': pronouns,
-    'project_dir': '${PROJECT_DIR}'
-}))
-" <<< "$USER_MSG")
+# --- Output Phase ---
 
-RESULT=$("$SCRIPT_DIR/resolve.sh" <<< "$PAYLOAD")
-
-if [ -n "$RESULT" ]; then
-  printf '%s\n' "$RESULT"
+if [ ${#FLAGS[@]} -gt 0 ]; then
+  # Compact preamble so Claude knows how to handle flags without needing SKILL.md loaded
+  echo "[PRONOUN-RESOLVER: Resolve these using conversation context. HIGH confidence=act silently. MEDIUM=state assumption then act. LOW/no context=ask user first.]"
+  printf '%s\n' "${FLAGS[@]}"
 fi
