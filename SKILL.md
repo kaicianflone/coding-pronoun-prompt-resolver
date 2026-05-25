@@ -1,6 +1,6 @@
 ---
 name: pronoun-resolver
-version: 0.2.0
+version: 0.9.1
 description: |
   Detects ambiguous pronouns, vague referents, and bare imperatives in user messages
   and flags them for resolution using conversation context. Zero-latency detection via
