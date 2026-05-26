@@ -96,7 +96,7 @@ When Claude sees flags, it applies this framework:
 
 ## Self-Learning Ledger
 
-Resolution accuracy is tracked at `.claude/pronoun-ledger.json`. When Claude resolves a reference, it logs the result. When the user corrects it, the entry is marked and confidence calibration adjusts.
+Resolution accuracy is tracked at `~/.claude/skills/pronoun-resolver/.claude/pronoun-ledger.json` (inside the skill directory, never in your project). When Claude resolves a reference, it logs metadata — no raw prompt text is stored. When the user corrects it, the entry is marked and confidence calibration adjusts.
 
 ```json
 {
@@ -107,14 +107,31 @@ Resolution accuracy is tracked at `.claude/pronoun-ledger.json`. When Claude res
 }
 ```
 
+## Data Retention
+
+This skill stores two local files inside the skill directory (`~/.claude/skills/pronoun-resolver/.claude/`):
+
+- **pronoun-ledger.json** — resolution metadata (pronoun, resolved referent, confidence tier, correction status). Prompts are hashed, never stored as text.
+- **pronoun-resolver-analytics.jsonl** — per-message stats (timestamp, flag count, word count). No message content is stored.
+
+No data is sent externally. Both files are local-only and can be deleted at any time without affecting functionality. To clear all stored data: `rm ~/.claude/skills/pronoun-resolver/.claude/pronoun-ledger.json ~/.claude/skills/pronoun-resolver/.claude/pronoun-resolver-analytics.jsonl`
+
 ## File Structure
 
 ```
 pronoun-resolver/
   SKILL.md                  # Skill definition + resolution framework
+  README.md                 # This file
   bin/
     detect-pronouns.sh      # Hook entry point — regex + orchestration
     detect-implicit.py      # Bare imperative heuristic detector
+    stats.py                # Analytics summary display
+  .claude/
+    pronoun-ledger.json     # Resolution metadata (auto-created)
+    pronoun-resolver-analytics.jsonl  # Per-message stats (auto-created)
+  evals/
+    cases.json              # Eval test cases
+    results.json            # Eval results
 ```
 
 ## Install
@@ -164,7 +181,7 @@ rm .claude/pronoun-resolver-disabled
 ### Reset the ledger
 
 ```bash
-rm .claude/pronoun-ledger.json
+rm ~/.claude/skills/pronoun-resolver/.claude/pronoun-ledger.json
 ```
 
 ## Requirements

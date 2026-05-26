@@ -1,3 +1,4 @@
-pronoun-ledger.json
+.claude/pronoun-ledger.json
+.claude/pronoun-resolver-analytics.jsonl
 pronoun-resolver-disabled
 .DS_Store

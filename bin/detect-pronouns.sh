@@ -93,6 +93,36 @@ if [ ${#FLAGS[@]} -eq 0 ]; then
   fi
 fi
 
+# --- Analytics Phase ---
+
+ANALYTICS_DIR="$SCRIPT_DIR/../.claude"
+ANALYTICS_FILE="$ANALYTICS_DIR/pronoun-resolver-analytics.jsonl"
+FLAGGED=0
+FLAG_TYPES=""
+
+if [ ${#FLAGS[@]} -gt 0 ]; then
+  FLAGGED=1
+  for f in "${FLAGS[@]}"; do
+    case "$f" in
+      *type=pronoun*) FLAG_TYPES="${FLAG_TYPES}pronoun," ;;
+      *type=vague_referent*) FLAG_TYPES="${FLAG_TYPES}vague," ;;
+      *type=bare_imperative*) FLAG_TYPES="${FLAG_TYPES}implicit," ;;
+    esac
+  done
+  FLAG_TYPES="${FLAG_TYPES%,}"
+fi
+
+# Append analytics (non-blocking, never fail the hook)
+{
+  mkdir -p "$ANALYTICS_DIR"
+  printf '{"ts":"%s","flagged":%s,"types":"%s","word_count":%d}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    "$FLAGGED" \
+    "$FLAG_TYPES" \
+    "$(printf '%s' "$USER_MSG_FLAT" | wc -w | tr -d ' ')" \
+    >> "$ANALYTICS_FILE"
+} 2>/dev/null || true
+
 # --- Output Phase ---
 
 if [ ${#FLAGS[@]} -gt 0 ]; then
