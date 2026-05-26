@@ -8,8 +8,8 @@ from collections import Counter
 from datetime import datetime
 
 def main():
-    project_dir = os.popen("git rev-parse --show-toplevel 2>/dev/null").read().strip() or os.getcwd()
-    analytics_file = os.path.join(project_dir, ".claude", "pronoun-resolver-analytics.jsonl")
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    analytics_file = os.path.join(script_dir, "..", ".claude", "pronoun-resolver-analytics.jsonl")
 
     if not os.path.exists(analytics_file):
         print("No analytics data yet. The hook will start logging on your next message.")

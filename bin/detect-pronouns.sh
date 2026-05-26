@@ -95,7 +95,7 @@ fi
 
 # --- Analytics Phase ---
 
-ANALYTICS_DIR="$PROJECT_DIR/.claude"
+ANALYTICS_DIR="$SCRIPT_DIR/../.claude"
 ANALYTICS_FILE="$ANALYTICS_DIR/pronoun-resolver-analytics.jsonl"
 FLAGGED=0
 FLAG_TYPES=""

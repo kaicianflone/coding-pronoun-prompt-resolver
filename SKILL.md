@@ -1,11 +1,18 @@
 ---
 name: pronoun-resolver
-version: 0.9.1
+version: 0.10.0
 description: |
   Detects ambiguous pronouns, vague referents, and bare imperatives in user messages
   and flags them for resolution using conversation context. Zero-latency detection via
   hook; resolution happens inside the conversation where context lives. Self-learning
   via correction ledger with adaptive confidence tiering.
+capabilities:
+  - user-prompt-submit hook (fires on every message, regex-only, no LLM calls)
+  - file-write: ~/.claude/skills/pronoun-resolver/.claude/pronoun-ledger.json (resolution metadata, no raw prompts)
+  - file-write: ~/.claude/skills/pronoun-resolver/.claude/pronoun-resolver-analytics.jsonl (per-message stats)
+data_retention: |
+  All data is local-only, never transmitted externally. Prompts are hashed (SHA-256),
+  never stored as text. Both data files can be deleted without affecting functionality.
 hooks:
   user-prompt-submit:
     - type: command
@@ -61,7 +68,7 @@ The hook outputs a preamble followed by flags:
 
 ## Ledger
 
-Resolution accuracy is tracked at `.claude/pronoun-ledger.json` in the project.
+Resolution accuracy is tracked at `~/.claude/skills/pronoun-resolver/.claude/pronoun-ledger.json`.
 When you resolve an ambiguous reference, log it. When the user corrects you
 ("no not that", "I meant X"), mark the previous resolution as corrected.
 
@@ -80,13 +87,15 @@ Each resolution entry:
 {
   "timestamp": "ISO8601",
   "pronoun": "it",
-  "original_prompt": "first 200 chars",
+  "prompt_hash": "sha256 hex of the full prompt (no raw text stored)",
   "resolved_to": "the auth middleware",
   "tier_used": "green|yellow|red|black",
   "confidence": 0.92,
   "was_corrected": false
 }
 ```
+
+Never store raw prompt text in the ledger. Use `prompt_hash` for deduplication only.
 
 ## Correction Detection
 
